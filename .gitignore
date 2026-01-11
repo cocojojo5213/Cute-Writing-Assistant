@@ -1,0 +1,15 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# 本地环境
+.env
+.env.local

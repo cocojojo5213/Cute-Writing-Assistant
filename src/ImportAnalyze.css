@@ -1,0 +1,102 @@
+.import-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+}
+.import-container {
+  width: 650px;
+  max-height: 80vh;
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.import-container h3 { font-size: 18px; margin-bottom: 8px; }
+.import-container .hint { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+.import-input {
+  flex: 1;
+  min-height: 250px;
+  padding: 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  resize: none;
+}
+.error-msg { color: #dc2626; font-size: 13px; margin-top: 8px; }
+.import-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+.char-count { color: #9ca3af; font-size: 12px; }
+.btn-analyze, .btn-import {
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6ee7b7, #34d399);
+  color: #065f46;
+}
+.btn-analyze:disabled { background: #e5e7eb; color: #9ca3af; }
+.btn-back {
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: white;
+  cursor: pointer;
+}
+.extract-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.extract-header button {
+  background: #f1f5f9;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.extract-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 350px;
+}
+.extract-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.extract-item.selected { border-color: #34d399; background: #f0fdf4; }
+.extract-item input { width: 18px; height: 18px; accent-color: #10b981; }
+.extract-info { flex: 1; }
+.extract-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.extract-title { font-weight: 500; }
+.extract-keywords { font-size: 11px; color: #9ca3af; margin-bottom: 4px; }
+.extract-preview { font-size: 12px; color: #6b7280; }
+.btn-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #9ca3af;
+}

@@ -1,0 +1,38 @@
+{
+  "name": "cute-writing-assistant",
+  "version": "1.0.0",
+  "description": "A lightweight novel writing assistant with AI and knowledge base",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cocojojo5213/Cute-Writing-Assistant.git"
+  },
+  "keywords": [
+    "writing",
+    "novel",
+    "ai",
+    "assistant",
+    "editor"
+  ],
+  "author": "cocojojo5213",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/file-saver": "^2.0.7",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  },
+  "dependencies": {
+    "file-saver": "^2.0.5",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "zustand": "^5.0.9"
+  }
+}
