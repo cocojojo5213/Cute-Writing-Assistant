@@ -214,5 +214,5 @@ export function createEmptyDetails(category: KnowledgeCategory): DetailsMap[Know
   fields.forEach(f => {
     details[f.key] = f.key === 'status' ? '未揭示' : ''
   })
-  return details as DetailsMap[KnowledgeCategory]
+  return details as unknown as DetailsMap[KnowledgeCategory]
 }
