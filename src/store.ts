@@ -40,6 +40,7 @@ interface Store {
   addKnowledge: (entry: Omit<KnowledgeEntry, 'id'>) => void
   updateKnowledge: (id: string, entry: Partial<KnowledgeEntry>) => void
   deleteKnowledge: (id: string) => void
+  clearKnowledge: () => void  // 清空所有知识库
   appendToKnowledge: (id: string, content: string) => void
   setExternalKnowledge: (entries: KnowledgeEntry[]) => void
   clearExternalKnowledge: () => void
@@ -153,6 +154,9 @@ export const useStore = create<Store>()(
 
       // 清空外部知识库
       clearExternalKnowledge: () => set({ externalKnowledge: [] }),
+
+      // 清空所有知识库
+      clearKnowledge: () => set({ knowledge: [] }),
     }),
     {
       name: 'writing-assistant-store',  // localStorage 的 key

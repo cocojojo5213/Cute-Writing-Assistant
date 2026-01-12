@@ -357,3 +357,79 @@
 .btn-close:hover {
   color: #1f2937;
 }
+
+/* 清空按钮 */
+.btn-clear-all {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fca5a5 !important;
+  margin-left: auto;
+}
+
+.btn-clear-all:hover {
+  background: #fee2e2 !important;
+}
+
+/* 确认对话框 */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.confirm-dialog {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  width: 360px;
+  text-align: center;
+}
+
+.confirm-dialog h4 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.confirm-dialog p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.confirm-dialog strong {
+  color: #dc2626;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirm-actions .btn-cancel {
+  padding: 10px 20px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.confirm-actions .btn-danger {
+  padding: 10px 20px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.confirm-actions .btn-danger:hover {
+  background: #b91c1c;
+}

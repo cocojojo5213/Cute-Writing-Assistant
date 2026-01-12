@@ -13,13 +13,14 @@ const CATEGORIES: KnowledgeCategory[] = [
 ]
 
 export function Knowledge({ onClose }: { onClose: () => void }) {
-  const { knowledge, addKnowledge, updateKnowledge, deleteKnowledge } = useStore()
+  const { knowledge, addKnowledge, updateKnowledge, deleteKnowledge, clearKnowledge } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [filter, setFilter] = useState<string>('全部')
   const [showImport, setShowImport] = useState(false)
   const [showLongImport, setShowLongImport] = useState(false)
   const [showMerge, setShowMerge] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [form, setForm] = useState<{
     title: string
     category: KnowledgeCategory
@@ -112,10 +113,13 @@ export function Knowledge({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="category-filter">
-            <button className={filter === '全部' ? 'active' : ''} onClick={() => setFilter('全部')}>全部</button>
+            <button className={filter === '全部' ? 'active' : ''} onClick={() => setFilter('全部')}>全部 ({knowledge.length})</button>
             {CATEGORIES.map(c => (
               <button key={c} className={filter === c ? 'active' : ''} onClick={() => setFilter(c)}>{c}</button>
             ))}
+            {knowledge.length > 0 && (
+              <button className="btn-clear-all" onClick={() => setShowClearConfirm(true)}>🗑️ 清空</button>
+            )}
           </div>
           <ul className="knowledge-list">
             {Object.entries(grouped).map(([category, items]) => (
@@ -225,6 +229,24 @@ export function Knowledge({ onClose }: { onClose: () => void }) {
       {showImport && <ImportAnalyze onClose={() => setShowImport(false)} />}
       {showLongImport && <LongTextImport onClose={() => setShowLongImport(false)} />}
       {showMerge && <MergeDuplicates onClose={() => setShowMerge(false)} />}
+
+      {/* 清空确认对话框 */}
+      {showClearConfirm && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <h4>⚠️ 确认清空知识库？</h4>
+            <p>此操作将删除所有 <strong>{knowledge.length}</strong> 个条目，且无法恢复。</p>
+            <div className="confirm-actions">
+              <button className="btn-cancel" onClick={() => setShowClearConfirm(false)}>取消</button>
+              <button className="btn-danger" onClick={() => {
+                clearKnowledge()
+                setShowClearConfirm(false)
+                setSelectedId(null)
+              }}>确认清空</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
