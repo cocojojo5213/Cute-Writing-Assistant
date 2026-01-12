@@ -60,11 +60,68 @@ interface ExtractedItem {
   content: string  // AI返回的是纯文本，导入时转换为details结构
 }
 
+// 预处理：清理文本中的网站元数据和无关内容
+function preprocessText(text: string): string {
+  let cleaned = text
+
+  // 移除网站元数据行（常见于AO3等平台）
+  const metadataPatterns = [
+    /Chapter Management[\s\S]*?Chapter Text/gi,  // AO3章节管理区
+    /Edit Chapter[\s\n]*/gi,
+    /^Notes:[\s\S]*?(?=第|Chapter|\n\n)/gmi,  // Notes区域
+    /^Summary:[\s\S]*?(?=第|Chapter|\n\n)/gmi,  // Summary区域
+    /Chapter\s+\d+\s*\n\s*Chapter Text/gi,  // 章节标记
+  ]
+
+  for (const pattern of metadataPatterns) {
+    cleaned = cleaned.replace(pattern, '\n')
+  }
+
+  // 移除分隔线
+  cleaned = cleaned.replace(/[…·]{10,}/g, '\n')
+  cleaned = cleaned.replace(/[-=]{10,}/g, '\n')
+
+  // 移除多余空行
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
+
+  console.log(`[preprocessText] 清理前: ${text.length}字, 清理后: ${cleaned.length}字`)
+
+  return cleaned.trim()
+}
+
+// 检查内容是否为正文（而非元数据）
+function isValidContent(text: string): boolean {
+  const trimmed = text.trim()
+
+  // 太短的不处理
+  if (trimmed.length < 200) return false
+
+  // 检查是否包含大量元数据特征
+  const metadataKeywords = [
+    '总字数', '章节数', '更新至', '预计', 'Chapter Management',
+    'Edit Chapter', 'Notes:', 'Summary:', '人物简介：', '谨慎入坑',
+    '警告！', '站反', 'OOC', '慢热型', '待补充'
+  ]
+
+  let metadataScore = 0
+  for (const keyword of metadataKeywords) {
+    if (trimmed.includes(keyword)) metadataScore++
+  }
+
+  // 如果超过3个元数据关键词，视为非正文
+  if (metadataScore >= 3) return false
+
+  return true
+}
+
 // 按章节或段落切分文本，每段不超过 maxLen 字
-function splitText(text: string, maxLen = 1500): { content: string; chapter?: string }[] {
+function splitText(text: string, maxLen = 3000): { content: string; chapter?: string }[] {
   const chunks: { content: string; chapter?: string }[] = []
 
-  console.log(`[splitText] 开始处理，原始文本长度: ${text.length}字`)
+  // 预处理文本
+  const cleanedText = preprocessText(text)
+
+  console.log(`[splitText] 开始处理，预处理后文本长度: ${cleanedText.length}字`)
 
   // 更广泛的章节标题匹配模式
   const chapterPatterns = [
@@ -80,7 +137,7 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
 
   for (const pattern of chapterPatterns) {
     pattern.lastIndex = 0
-    const matches = text.match(pattern)
+    const matches = cleanedText.match(pattern)
     console.log(`[splitText] 模式 ${pattern.source} 匹配到 ${matches?.length || 0} 个章节`)
     if (matches && matches.length > maxChapters) {
       maxChapters = matches.length
@@ -93,7 +150,7 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
   if (bestSplit && maxChapters > 1) {
     // 按最佳章节模式分割
     bestSplit.lastIndex = 0
-    const parts = text.split(bestSplit)
+    const parts = cleanedText.split(bestSplit)
     let currentChapter = ''
     console.log(`[splitText] 按章节分割得到 ${parts.length} 个部分`)
 
@@ -108,13 +165,9 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
         continue
       }
 
-      // 只过滤非常明显的纯元数据段落（更短且只包含统计信息）
-      const isMetadata = part.length < 50 && (
-        part.includes('总字数') || part.includes('章节数') ||
-        part.includes('更新至') || part.includes('预计')
-      )
-      if (isMetadata) {
-        console.log(`[splitText] 跳过元数据段: ${part.substring(0, 50)}...`)
+      // 验证是否为有效正文
+      if (!isValidContent(part)) {
+        console.log(`[splitText] 跳过非正文段落(${part.length}字): ${part.substring(0, 50)}...`)
         continue
       }
 
@@ -127,13 +180,15 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
         let current = ''
         for (const p of paragraphs) {
           if ((current + p).length > maxLen && current.trim()) {
-            chunks.push({ content: current.trim(), chapter: currentChapter || undefined })
+            if (isValidContent(current)) {
+              chunks.push({ content: current.trim(), chapter: currentChapter || undefined })
+            }
             current = p
           } else {
             current += (current ? '\n\n' : '') + p
           }
         }
-        if (current.trim().length > 50) {
+        if (current.trim().length > 200) {
           chunks.push({ content: current.trim(), chapter: currentChapter || undefined })
         }
       }
@@ -141,42 +196,34 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
   } else {
     // 没有明显章节结构，按段落分割
     console.log(`[splitText] 无章节结构，按段落分割`)
-    const paragraphs = text.split(/\n\s*\n/)
+    const paragraphs = cleanedText.split(/\n\s*\n/)
     let current = ''
     console.log(`[splitText] 段落数: ${paragraphs.length}`)
 
     for (const p of paragraphs) {
       const trimmed = p.trim()
-      if (!trimmed) continue
-
-      // 只跳过非常短的纯元数据
-      const isMetadata = trimmed.length < 30 && (
-        trimmed.includes('总字数') || trimmed.includes('章节数') ||
-        trimmed.includes('更新至') || trimmed.includes('预计')
-      )
-      if (isMetadata) {
-        console.log(`[splitText] 跳过元数据: ${trimmed}`)
-        continue
-      }
+      if (!trimmed || trimmed.length < 50) continue
 
       if ((current + trimmed).length > maxLen && current.trim()) {
-        chunks.push({ content: current.trim() })
+        if (isValidContent(current)) {
+          chunks.push({ content: current.trim() })
+        }
         current = trimmed
       } else {
         current += (current ? '\n\n' : '') + trimmed
       }
     }
 
-    if (current.trim().length > 50) {
+    if (current.trim().length > 200) {
       chunks.push({ content: current.trim() })
     }
   }
 
-  // 最终过滤：只过滤非常短的段落
-  const filtered = chunks.filter(chunk => chunk.content.length > 50)
+  // 最终过滤：确保每段都是有效正文且长度足够
+  const filtered = chunks.filter(chunk => isValidContent(chunk.content))
   console.log(`[splitText] 最终分段数: ${filtered.length}，过滤前: ${chunks.length}`)
   filtered.forEach((chunk, i) => {
-    console.log(`[splitText] 段${i + 1}: ${chunk.content.length}字, ${chunk.chapter || '无章节'}, 开头: ${chunk.content.substring(0, 30)}...`)
+    console.log(`[splitText] 段${i + 1}: ${chunk.content.length}字, ${chunk.chapter || '无章节'}, 开头: ${chunk.content.substring(0, 50)}...`)
   })
 
   return filtered
@@ -208,16 +255,20 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
       try {
         const res = await fetch(url, { ...options, signal })
         if (res.ok) return res
+        // 401认证错误不重试，立即报错
+        if (res.status === 401) {
+          throw new Error('API Key 无效或已过期，请检查设置')
+        }
         // 如果是网络错误（非业务错误），重试
         if (res.status >= 500 || res.status === 429) {
           lastError = new Error(`API 错误: ${res.status} ${res.statusText}`)
           console.log(`第${attempt}次请求失败(${res.status})，${attempt < maxRetries ? '准备重试...' : '放弃'}`)
           if (attempt < maxRetries) {
-            await new Promise(r => setTimeout(r, 1000 * attempt))  // 递增延迟
+            await new Promise(r => setTimeout(r, 2000 * attempt))  // 递增延迟
             continue
           }
         }
-        return res  // 4xx错误不重试
+        return res  // 其他4xx错误不重试
       } catch (e) {
         if (e instanceof Error && e.name === 'AbortError') throw e  // 取消不重试
         lastError = e instanceof Error ? e : new Error(String(e))
@@ -425,8 +476,8 @@ ${chunks[i].content}`
         return
       }
 
-      // 避免请求太快
-      await new Promise(r => setTimeout(r, 500))
+      // 避免请求太快，间隔2秒
+      await new Promise(r => setTimeout(r, 2000))
     }
 
     console.log(`分析完成，共提取 ${allResults.length} 个条目`)
