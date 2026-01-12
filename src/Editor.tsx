@@ -98,5 +98,5 @@ export function Editor({ content, onChange, onSendToAI }: EditorProps) {
       )}
       <div className="word-count">{countWords(content)} 字</div>
     </div>
-  }
+  )
 }
