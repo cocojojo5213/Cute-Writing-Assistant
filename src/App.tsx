@@ -7,7 +7,7 @@ import { Knowledge } from './Knowledge'
 import './App.css'
 
 function App() {
-  const { docs, currentDocId, messages, aiSettings, knowledge, externalKnowledge, addDoc, updateDoc, renameDoc, deleteDoc, setCurrentDoc, addMessage, clearMessages, updateAISettings, appendToKnowledge, setExternalKnowledge, clearExternalKnowledge } = useStore()
+  const { docs, currentDocId, messages, aiSettings, knowledge, externalKnowledge, saveApiKey, addDoc, updateDoc, renameDoc, deleteDoc, setCurrentDoc, addMessage, clearMessages, updateAISettings, setSaveApiKey, appendToKnowledge, setExternalKnowledge, clearExternalKnowledge } = useStore()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -116,9 +116,9 @@ function App() {
         {currentDoc ? (
           <>
             <div className="editor-panel">
-              <Editor 
-                content={currentDoc.content} 
-                onChange={(val) => updateDoc(currentDoc.id, val)} 
+              <Editor
+                content={currentDoc.content}
+                onChange={(val) => updateDoc(currentDoc.id, val)}
                 onSendToAI={(text) => setInput(text)}
               />
             </div>
@@ -184,9 +184,13 @@ function App() {
             </div>
             <label>API URL<input value={aiSettings.apiUrl} onChange={(e) => updateAISettings({ apiUrl: e.target.value })} /></label>
             <label>API Key<input type="password" value={aiSettings.apiKey} onChange={(e) => updateAISettings({ apiKey: e.target.value })} /></label>
+            <label className="checkbox-label">
+              <input type="checkbox" checked={saveApiKey} onChange={(e) => setSaveApiKey(e.target.checked)} />
+              <span>记住API Key（保存到本地，方便下次使用）</span>
+            </label>
             <label>模型<input value={aiSettings.model} onChange={(e) => updateAISettings({ model: e.target.value })} /></label>
             <label>系统提示词<textarea className="system-prompt-input" value={aiSettings.systemPrompt} onChange={(e) => updateAISettings({ systemPrompt: e.target.value })} placeholder="自定义AI助手的角色和行为..." /></label>
-            
+
             <div className="settings-section">
               <h4>数据管理</h4>
               <p className="storage-info">存储使用: {storageUsage} / ~5MB</p>

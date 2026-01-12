@@ -11,29 +11,31 @@ interface Store {
   // 文档相关
   docs: Doc[]                    // 所有文档列表
   currentDocId: string | null    // 当前选中的文档ID
-  
+
   // AI对话相关
   messages: Message[]            // 对话消息列表
   aiSettings: AISettings         // AI配置（API地址、密钥、模型）
-  
+  saveApiKey: boolean            // 是否保存API Key到本地
+
   // 知识库相关
   knowledge: KnowledgeEntry[]           // 内置知识库（存储到localStorage）
   externalKnowledge: KnowledgeEntry[]   // 外部知识库（不存储，临时加载）
-  
+
   // 文档操作方法
   addDoc: (title: string) => void
   updateDoc: (id: string, content: string) => void
   renameDoc: (id: string, title: string) => void
   deleteDoc: (id: string) => void
   setCurrentDoc: (id: string) => void
-  
+
   // 消息操作方法
   addMessage: (msg: Message) => void
   clearMessages: () => void
-  
+
   // 设置操作方法
   updateAISettings: (settings: Partial<AISettings>) => void
-  
+  setSaveApiKey: (save: boolean) => void
+
   // 知识库操作方法
   addKnowledge: (entry: Omit<KnowledgeEntry, 'id'>) => void
   updateKnowledge: (id: string, entry: Partial<KnowledgeEntry>) => void
@@ -58,6 +60,7 @@ export const useStore = create<Store>()(
       },
       knowledge: [],
       externalKnowledge: [],
+      saveApiKey: false,  // 默认不保存API Key
 
       // 新建文档
       addDoc: (title) => {
@@ -94,7 +97,7 @@ export const useStore = create<Store>()(
         })),
 
       // 切换当前文档（同时清空聊天记录，避免串话）
-      setCurrentDoc: (id) => set((s) => ({ 
+      setCurrentDoc: (id) => set((s) => ({
         currentDocId: id,
         messages: s.currentDocId !== id ? [] : s.messages,
       })),
@@ -108,6 +111,9 @@ export const useStore = create<Store>()(
       // 更新AI设置
       updateAISettings: (settings) =>
         set((s) => ({ aiSettings: { ...s.aiSettings, ...settings } })),
+
+      // 设置是否保存API Key
+      setSaveApiKey: (save) => set({ saveApiKey: save }),
 
       // 添加知识库条目
       addKnowledge: (entry) =>
@@ -144,11 +150,11 @@ export const useStore = create<Store>()(
 
       // 设置外部知识库（从JSON文件加载）
       setExternalKnowledge: (entries) => set({ externalKnowledge: entries }),
-      
+
       // 清空外部知识库
       clearExternalKnowledge: () => set({ externalKnowledge: [] }),
     }),
-    { 
+    {
       name: 'writing-assistant-store',  // localStorage 的 key
       // 只持久化这些字段，externalKnowledge 不存储
       // apiKey 不持久化，避免泄露风险
@@ -156,11 +162,13 @@ export const useStore = create<Store>()(
         docs: state.docs,
         currentDocId: state.currentDocId,
         messages: state.messages,
+        saveApiKey: state.saveApiKey,
         aiSettings: {
           apiUrl: state.aiSettings.apiUrl,
           model: state.aiSettings.model,
           systemPrompt: state.aiSettings.systemPrompt,
-          // apiKey 故意不持久化，每次启动需重新输入
+          // 根据用户选择决定是否保存apiKey
+          ...(state.saveApiKey ? { apiKey: state.aiSettings.apiKey } : {}),
         },
         knowledge: state.knowledge,
       })

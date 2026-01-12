@@ -27,16 +27,20 @@ export function getMatchedKnowledge(text: string): KnowledgeEntry[] {
  */
 function formatKnowledgeDetails(entry: KnowledgeEntry): string {
   const fields = CATEGORY_FIELDS[entry.category]
-  const details = entry.details
+  // 防御性检查：如果category无效，直接返回details的所有值
+  if (!fields) {
+    return Object.values(entry.details || {}).filter(v => v && typeof v === 'string').join('\n')
+  }
+  const details = entry.details || {}
   const parts: string[] = []
-  
+
   fields.forEach(field => {
     const value = details[field.key]
-    if (value && value.trim()) {
+    if (value && typeof value === 'string' && value.trim()) {
       parts.push(`${field.label}：${value}`)
     }
   })
-  
+
   return parts.join('\n')
 }
 

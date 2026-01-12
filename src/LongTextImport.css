@@ -1,7 +1,7 @@
 .long-import-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -102,7 +102,8 @@
   font-weight: 500;
 }
 
-.btn-analyze, .btn-import {
+.btn-analyze,
+.btn-import {
   padding: 12px 24px;
   border-radius: 10px;
   border: none;
@@ -222,4 +223,46 @@
 
 .btn-restart:hover {
   background: #f9fafb;
+}
+
+/* 加载中控制按钮 */
+.loading-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-pause {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #fbbf24;
+  background: #fffbeb;
+  cursor: pointer;
+  font-size: 13px;
+  color: #b45309;
+  font-weight: 500;
+}
+
+.btn-pause:hover {
+  background: #fef3c7;
+}
+
+.btn-pause:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  cursor: pointer;
+  font-size: 13px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.btn-cancel:hover {
+  background: #fee2e2;
 }

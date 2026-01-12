@@ -1,9 +1,57 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useStore } from './store'
 import { createEmptyDetails } from './types'
 import type { KnowledgeCategory } from './types'
 import mammoth from 'mammoth'
 import './LongTextImport.css'
+
+// 合法的分类列表
+const VALID_CATEGORIES: KnowledgeCategory[] = [
+  '人物简介', '世界观', '剧情梗概', '章节梗概',
+  '支线伏笔', '道具物品', '场景地点', '时间线', '写作素材'
+]
+
+// 分类映射(处理AI可能返回的不规范分类名)
+const CATEGORY_MAP: Record<string, KnowledgeCategory> = {
+  '人物': '人物简介',
+  '角色': '人物简介',
+  '角色设定': '人物简介',
+  '人物设定': '人物简介',
+  '世界设定': '世界观',
+  '背景设定': '世界观',
+  '剧情': '剧情梗概',
+  '主线剧情': '剧情梗概',
+  '章节': '章节梗概',
+  '伏笔': '支线伏笔',
+  '道具': '道具物品',
+  '物品': '道具物品',
+  '场景': '场景地点',
+  '地点': '场景地点',
+  '素材': '写作素材',
+}
+
+// 标准化分类名
+function normalizeCategory(category: string): KnowledgeCategory {
+  // 先检查是否已经是合法分类
+  if (VALID_CATEGORIES.includes(category as KnowledgeCategory)) {
+    return category as KnowledgeCategory
+  }
+  // 尝试映射
+  const mapped = CATEGORY_MAP[category]
+  if (mapped) return mapped
+  // 默认归类到写作素材
+  console.warn(`[normalizeCategory] 未知分类 "${category}"，归类到"写作素材"`)
+  return '写作素材'
+}
+
+// 清理AI返回的JSON（移除markdown代码块等）
+function cleanAIResponse(content: string): string {
+  // 移除 ```json ... ``` 包装
+  let cleaned = content.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+  // 移除开头的非JSON字符
+  cleaned = cleaned.trim()
+  return cleaned
+}
 
 interface ExtractedItem {
   category: KnowledgeCategory
@@ -15,7 +63,9 @@ interface ExtractedItem {
 // 按章节或段落切分文本，每段不超过 maxLen 字
 function splitText(text: string, maxLen = 1500): { content: string; chapter?: string }[] {
   const chunks: { content: string; chapter?: string }[] = []
-  
+
+  console.log(`[splitText] 开始处理，原始文本长度: ${text.length}字`)
+
   // 更广泛的章节标题匹配模式
   const chapterPatterns = [
     /(第[一二三四五六七八九十百千\d]+章[^\n]*)/gi,
@@ -23,42 +73,51 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
     /([第]?\d+[章节][^\n]*)/gi,
     /(序章|楔子|尾声|后记|番外[^\n]*)/gi
   ]
-  
+
   // 先尝试按章节分割
   let bestSplit = null
   let maxChapters = 0
-  
+
   for (const pattern of chapterPatterns) {
     pattern.lastIndex = 0
     const matches = text.match(pattern)
+    console.log(`[splitText] 模式 ${pattern.source} 匹配到 ${matches?.length || 0} 个章节`)
     if (matches && matches.length > maxChapters) {
       maxChapters = matches.length
       bestSplit = pattern
     }
   }
-  
+
+  console.log(`[splitText] 最佳匹配: ${maxChapters} 个章节`)
+
   if (bestSplit && maxChapters > 1) {
     // 按最佳章节模式分割
     bestSplit.lastIndex = 0
     const parts = text.split(bestSplit)
     let currentChapter = ''
-    
+    console.log(`[splitText] 按章节分割得到 ${parts.length} 个部分`)
+
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i].trim()
       if (!part) continue
-      
+
       // 检查是否是章节标题
       if (bestSplit.test(part)) {
         bestSplit.lastIndex = 0
         currentChapter = part
         continue
       }
-      
-      // 过滤掉明显的元数据和统计信息
-      if (part.includes('总字数') || part.includes('章节数') || 
-          part.includes('更新至') || part.includes('预计') ||
-          part.length < 100) continue
-      
+
+      // 只过滤非常明显的纯元数据段落（更短且只包含统计信息）
+      const isMetadata = part.length < 50 && (
+        part.includes('总字数') || part.includes('章节数') ||
+        part.includes('更新至') || part.includes('预计')
+      )
+      if (isMetadata) {
+        console.log(`[splitText] 跳过元数据段: ${part.substring(0, 50)}...`)
+        continue
+      }
+
       // 分段处理
       if (part.length <= maxLen) {
         chunks.push({ content: part, chapter: currentChapter || undefined })
@@ -74,23 +133,32 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
             current += (current ? '\n\n' : '') + p
           }
         }
-        if (current.trim().length > 100) {
+        if (current.trim().length > 50) {
           chunks.push({ content: current.trim(), chapter: currentChapter || undefined })
         }
       }
     }
   } else {
     // 没有明显章节结构，按段落分割
+    console.log(`[splitText] 无章节结构，按段落分割`)
     const paragraphs = text.split(/\n\s*\n/)
     let current = ''
-    
+    console.log(`[splitText] 段落数: ${paragraphs.length}`)
+
     for (const p of paragraphs) {
       const trimmed = p.trim()
-      // 跳过元数据
-      if (trimmed.includes('总字数') || trimmed.includes('章节数') || 
-          trimmed.includes('更新至') || trimmed.includes('预计') ||
-          trimmed.length < 50) continue
-          
+      if (!trimmed) continue
+
+      // 只跳过非常短的纯元数据
+      const isMetadata = trimmed.length < 30 && (
+        trimmed.includes('总字数') || trimmed.includes('章节数') ||
+        trimmed.includes('更新至') || trimmed.includes('预计')
+      )
+      if (isMetadata) {
+        console.log(`[splitText] 跳过元数据: ${trimmed}`)
+        continue
+      }
+
       if ((current + trimmed).length > maxLen && current.trim()) {
         chunks.push({ content: current.trim() })
         current = trimmed
@@ -98,13 +166,20 @@ function splitText(text: string, maxLen = 1500): { content: string; chapter?: st
         current += (current ? '\n\n' : '') + trimmed
       }
     }
-    
-    if (current.trim().length > 100) {
+
+    if (current.trim().length > 50) {
       chunks.push({ content: current.trim() })
     }
   }
-  
-  return chunks.filter(chunk => chunk.content.length > 100)
+
+  // 最终过滤：只过滤非常短的段落
+  const filtered = chunks.filter(chunk => chunk.content.length > 50)
+  console.log(`[splitText] 最终分段数: ${filtered.length}，过滤前: ${chunks.length}`)
+  filtered.forEach((chunk, i) => {
+    console.log(`[splitText] 段${i + 1}: ${chunk.content.length}字, ${chunk.chapter || '无章节'}, 开头: ${chunk.content.substring(0, 30)}...`)
+  })
+
+  return filtered
 }
 
 export function LongTextImport({ onClose }: { onClose: () => void }) {
@@ -117,6 +192,58 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
   // 断点续传相关状态
   const [pausedAt, setPausedAt] = useState<number | null>(null)
   const [cachedChunks, setCachedChunks] = useState<{ content: string; chapter?: string }[]>([])
+  // 取消/暂停控制
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const [isPausing, setIsPausing] = useState(false)  // 用户点击了暂停按钮
+
+  // 带重试的fetch函数
+  const fetchWithRetry = async (
+    url: string,
+    options: RequestInit,
+    maxRetries = 3,
+    signal?: AbortSignal
+  ): Promise<Response> => {
+    let lastError: Error | null = null
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await fetch(url, { ...options, signal })
+        if (res.ok) return res
+        // 如果是网络错误（非业务错误），重试
+        if (res.status >= 500 || res.status === 429) {
+          lastError = new Error(`API 错误: ${res.status} ${res.statusText}`)
+          console.log(`第${attempt}次请求失败(${res.status})，${attempt < maxRetries ? '准备重试...' : '放弃'}`)
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, 1000 * attempt))  // 递增延迟
+            continue
+          }
+        }
+        return res  // 4xx错误不重试
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') throw e  // 取消不重试
+        lastError = e instanceof Error ? e : new Error(String(e))
+        console.log(`第${attempt}次请求异常: ${lastError.message}，${attempt < maxRetries ? '准备重试...' : '放弃'}`)
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * attempt))
+        }
+      }
+    }
+    throw lastError || new Error('请求失败')
+  }
+
+  // 暂停分析
+  const handlePause = () => {
+    setIsPausing(true)
+    abortControllerRef.current?.abort()
+  }
+
+  // 取消分析
+  const handleCancel = () => {
+    abortControllerRef.current?.abort()
+    setLoading(false)
+    setIsPausing(false)
+    setPausedAt(null)
+    setError('已取消分析')
+  }
 
   // 读取文件
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,7 +251,7 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
     if (!file) return
 
     setError('')
-    
+
     if (file.name.endsWith('.txt')) {
       const content = await file.text()
       setText(content)
@@ -153,21 +280,46 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
     if (resumeFrom === 0) {
       setCachedChunks(chunks)
       setResults([])
+      // 调试信息：显示分段结果
+      console.log(`文本长度: ${text.length}字，分成 ${chunks.length} 段`)
+      chunks.forEach((chunk, i) => {
+        console.log(`第${i + 1}段 (${chunk.content.length}字): ${chunk.chapter || '无章节'} - ${chunk.content.substring(0, 50)}...`)
+      })
     }
-    
+
     setProgress({ current: resumeFrom, total: chunks.length })
     setLoading(true)
     setError('')
     setPausedAt(null)
-    
+    setIsPausing(false)
+
+    // 创建AbortController用于取消
+    abortControllerRef.current = new AbortController()
+    const signal = abortControllerRef.current.signal
+
     const allResults: ExtractedItem[] = resumeFrom > 0 ? [...results] : []
 
     for (let i = resumeFrom; i < chunks.length; i++) {
+      // 检查是否被暂停/取消
+      if (signal.aborted) {
+        if (isPausing) {
+          setPausedAt(i)
+          setResults(allResults)
+          setLoading(false)
+          setIsPausing(false)
+          setError(`已暂停，完成 ${i}/${chunks.length} 段`)
+          return
+        }
+        break
+      }
+
       setProgress({ current: i + 1, total: chunks.length })
-      
+
       try {
         const chapterHint = chunks[i].chapter ? `\n当前章节：${chunks[i].chapter}` : ''
-        const res = await fetch(aiSettings.apiUrl, {
+        console.log(`正在分析第 ${i + 1} 段: ${chunks[i].content.length}字`)
+
+        const res = await fetchWithRetry(aiSettings.apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -198,6 +350,7 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
 - 所有伏笔、暗示都要捕捉
 - content 字段至少150字以上，要非常详细
 - 关键词要包含人名、地名、术语等便于后续检索的词汇
+- 如果这段内容是目录、统计信息、创作计划等元数据，请返回空数组 []
 
 返回JSON数组格式：[{"category":"人物简介|世界观|剧情梗概|章节梗概|支线伏笔|道具物品|场景地点|时间线|写作素材","title":"名称","keywords":["关键词1","关键词2"],"content":"详细描述（至少150字）"}]
 只返回JSON数组，不要其他内容。如果没有可提取的内容，返回空数组 []
@@ -206,49 +359,89 @@ ${chapterHint}
 ${chunks[i].content}`
             }]
           })
-        })
-        
+        }, 3, signal)  // 最多重试3次
+
         if (!res.ok) {
           throw new Error(`API 错误: ${res.status} ${res.statusText}`)
         }
-        
+
         const data = await res.json()
         if (data.error) {
           throw new Error(data.error.message || 'API 返回错误')
         }
-        
-        const content = data.choices?.[0]?.message?.content || '[]'
-        const match = content.match(/\[[\s\S]*\]/)
+
+        const rawContent = data.choices?.[0]?.message?.content || '[]'
+        console.log(`第 ${i + 1} 段AI返回:`, rawContent.substring(0, 200))
+
+        // 清理并解析JSON
+        const cleanedContent = cleanAIResponse(rawContent)
+        const match = cleanedContent.match(/\[[\s\S]*\]/)
         if (match) {
-          const items = JSON.parse(match[0]) as ExtractedItem[]
-          allResults.push(...items)
-          setResults([...allResults]) // 实时更新结果
+          try {
+            const rawItems = JSON.parse(match[0]) as Array<{
+              category?: string
+              title?: string
+              keywords?: string[] | string
+              content?: string
+            }>
+            // 验证和标准化每个条目
+            const validItems: ExtractedItem[] = rawItems
+              .filter(item => item && item.title && item.content)
+              .map(item => ({
+                category: normalizeCategory(item.category || '写作素材'),
+                title: String(item.title || '未命名'),
+                keywords: Array.isArray(item.keywords)
+                  ? item.keywords.map(k => String(k))
+                  : typeof item.keywords === 'string'
+                    ? item.keywords.split(/[,，]/).map(k => k.trim()).filter(Boolean)
+                    : [],
+                content: String(item.content || '')
+              }))
+            console.log(`第 ${i + 1} 段提取到 ${validItems.length} 个有效条目`)
+            allResults.push(...validItems)
+            setResults([...allResults]) // 实时更新结果
+          } catch (parseError) {
+            console.error(`第 ${i + 1} 段JSON解析失败:`, parseError, '\n原始内容:', match[0].substring(0, 200))
+          }
         }
       } catch (e) {
+        // 检查是否是用户取消
+        if (e instanceof Error && e.name === 'AbortError') {
+          if (isPausing) {
+            setPausedAt(i)
+            setResults(allResults)
+            setLoading(false)
+            setIsPausing(false)
+            setError(`已暂停，完成 ${i}/${chunks.length} 段`)
+          }
+          return
+        }
         console.error('分析第', i + 1, '段失败:', e)
         // 保存断点，允许续传
-        setError(`第 ${i + 1} 段分析失败: ${e instanceof Error ? e.message : '未知错误'}`)
+        setError(`第 ${i + 1} 段分析失败(已重试3次): ${e instanceof Error ? e.message : '未知错误'}`)
         setPausedAt(i)
         setResults(allResults)
         setLoading(false)
         return
       }
-      
+
       // 避免请求太快
       await new Promise(r => setTimeout(r, 500))
     }
 
+    console.log(`分析完成，共提取 ${allResults.length} 个条目`)
     setResults(allResults)
     setLoading(false)
     setCachedChunks([])
     setPausedAt(null)
+    abortControllerRef.current = null
   }
 
   // 不自动合并，显示所有提取的条目
   const mergedResults = results.map((item, index) => ({
     ...item,
     // 如果标题重复，添加序号区分
-    title: results.filter((r, i) => i <= index && r.title === item.title && r.category === item.category).length > 1 
+    title: results.filter((r, i) => i <= index && r.title === item.title && r.category === item.category).length > 1
       ? `${item.title} (${results.filter((r, i) => i <= index && r.title === item.title && r.category === item.category).length})`
       : item.title
   }))
@@ -261,14 +454,14 @@ ${chunks[i].content}`
       if (firstKey) {
         details[firstKey] = item.content
       }
-      
+
       addKnowledge({
         category: item.category,
         title: item.title,
         keywords: item.keywords,
         details: details
       })
-      
+
       // 添加小延迟确保ID不重复
       await new Promise(r => setTimeout(r, 1))
     }
@@ -280,7 +473,7 @@ ${chunks[i].content}`
       <div className="long-import-container">
         <button className="btn-close" onClick={onClose}>x</button>
         <h3>长文分析导入</h3>
-        
+
         {results.length === 0 ? (
           <>
             <p className="hint">
@@ -304,12 +497,20 @@ ${chunks[i].content}`
             <div className="long-footer">
               <span className="char-count">{text.length.toLocaleString()} 字</span>
               {loading ? (
-                <span className="progress">
-                  正在分析第 {progress.current}/{progress.total} 段...
-                </span>
+                <div className="loading-controls">
+                  <span className="progress">
+                    正在分析第 {progress.current}/{progress.total} 段...
+                  </span>
+                  <button className="btn-pause" onClick={handlePause} disabled={isPausing}>
+                    {isPausing ? '暂停中...' : '暂停'}
+                  </button>
+                  <button className="btn-cancel" onClick={handleCancel}>
+                    取消
+                  </button>
+                </div>
               ) : pausedAt !== null ? (
                 <div className="resume-section">
-                  <span className="pause-info">已完成 {pausedAt}/{cachedChunks.length} 段，已提取 {results.length} 条</span>
+                  <span className="pause-info">已完成 {pausedAt}/{cachedChunks.length} 段（第{pausedAt + 1}段失败），已提取 {results.length} 条</span>
                   <button className="btn-resume" onClick={() => handleAnalyze(pausedAt)}>
                     继续分析
                   </button>
@@ -336,7 +537,7 @@ ${chunks[i].content}`
                     <span className="category-tag">{item.category}</span>
                     <span className="result-title">{item.title}</span>
                   </div>
-                  <div className="result-keywords">关键词: {item.keywords.join(', ')}</div>
+                  <div className="result-keywords">关键词: {Array.isArray(item.keywords) ? item.keywords.join(', ') : String(item.keywords || '')}</div>
                   <div className="result-preview">{item.content.slice(0, 150)}...</div>
                 </div>
               ))}

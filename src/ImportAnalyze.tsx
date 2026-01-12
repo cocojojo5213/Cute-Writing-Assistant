@@ -4,6 +4,30 @@ import type { KnowledgeCategory } from './types'
 import { createEmptyDetails } from './types'
 import './ImportAnalyze.css'
 
+// 合法的分类列表
+const VALID_CATEGORIES: KnowledgeCategory[] = [
+  '人物简介', '世界观', '剧情梗概', '章节梗概',
+  '支线伏笔', '道具物品', '场景地点', '时间线', '写作素材'
+]
+
+// 分类映射
+const CATEGORY_MAP: Record<string, KnowledgeCategory> = {
+  '人物': '人物简介', '角色': '人物简介', '角色设定': '人物简介',
+  '世界设定': '世界观', '背景设定': '世界观',
+  '剧情': '剧情梗概', '章节': '章节梗概',
+  '伏笔': '支线伏笔', '道具': '道具物品', '物品': '道具物品',
+  '场景': '场景地点', '地点': '场景地点', '素材': '写作素材',
+}
+
+function normalizeCategory(category: string): KnowledgeCategory {
+  if (VALID_CATEGORIES.includes(category as KnowledgeCategory)) return category as KnowledgeCategory
+  return CATEGORY_MAP[category] || '写作素材'
+}
+
+function cleanAIResponse(content: string): string {
+  return content.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+}
+
 interface ExtractedEntry {
   category: KnowledgeCategory
   title: string
@@ -57,11 +81,38 @@ ${text}`
         })
       })
       const data = await res.json()
-      const content = data.choices?.[0]?.message?.content || ''
-      const match = content.match(/\[[\s\S]*\]/)
+      const rawContent = data.choices?.[0]?.message?.content || ''
+      const cleanedContent = cleanAIResponse(rawContent)
+      const match = cleanedContent.match(/\[[\s\S]*\]/)
       if (match) {
-        const parsed = JSON.parse(match[0])
-        setEntries(parsed.map((e: Omit<ExtractedEntry, 'selected'>) => ({ ...e, selected: true })))
+        try {
+          const rawParsed = JSON.parse(match[0]) as Array<{
+            category?: string
+            title?: string
+            keywords?: string[] | string
+            content?: string
+          }>
+          // 验证和标准化
+          const validEntries = rawParsed
+            .filter(e => e && e.title && e.content)
+            .map(e => ({
+              category: normalizeCategory(e.category || '写作素材'),
+              title: String(e.title || '未命名'),
+              keywords: Array.isArray(e.keywords)
+                ? e.keywords.map(k => String(k))
+                : typeof e.keywords === 'string'
+                  ? e.keywords.split(/[,，]/).map(k => k.trim()).filter(Boolean)
+                  : [],
+              content: String(e.content || ''),
+              selected: true
+            }))
+          setEntries(validEntries)
+        } catch (parseError) {
+          console.error('JSON解析失败:', parseError)
+          setError('分析结果解析失败，请重试')
+        }
+      } else {
+        setError('AI未返回有效结果')
       }
     } catch (e) {
       setError('分析失败: ' + (e instanceof Error ? e.message : '未知错误'))
@@ -78,14 +129,14 @@ ${text}`
       if (firstKey) {
         details[firstKey] = e.content
       }
-      
-      addKnowledge({ 
-        category: e.category, 
-        title: e.title, 
-        keywords: e.keywords, 
-        details: details 
+
+      addKnowledge({
+        category: e.category,
+        title: e.title,
+        keywords: e.keywords,
+        details: details
       })
-      
+
       // 添加小延迟确保ID不重复
       await new Promise(r => setTimeout(r, 1))
     }
@@ -123,7 +174,7 @@ ${text}`
                   <input type="checkbox" checked={e.selected} readOnly />
                   <div className="extract-info">
                     <div className="extract-meta"><span className="category-tag">{e.category}</span><span className="extract-title">{e.title}</span></div>
-                    <div className="extract-keywords">关键词: {e.keywords.join(', ')}</div>
+                    <div className="extract-keywords">关键词: {Array.isArray(e.keywords) ? e.keywords.join(', ') : String(e.keywords || '')}</div>
                     <div className="extract-preview">{e.content.slice(0, 100)}...</div>
                   </div>
                 </div>
