@@ -10,18 +10,29 @@ interface DuplicateGroup {
     entries: KnowledgeEntry[]
 }
 
-// 提取标题的基础名称（去除编号后缀）
+// 提取标题的基础名称（去除各种后缀和括号内容）
 function getBaseName(title: string): string {
-    // 移除 (2), (3), （2）, （3） 等后缀
-    return title.replace(/\s*[（(]\d+[)）]\s*$/, '').trim()
+    // 1. 移除编号后缀 (2), (3), （2）, （3）
+    let name = title.replace(/\s*[（(]\d+[)）]\s*$/, '')
+
+    // 2. 移除括号及其内容 (xxx), （xxx）
+    name = name.replace(/\s*[（(][^)）]+[)）]\s*$/, '')
+
+    // 3. 移除常见标题后缀
+    name = name.replace(/\s*[-—：:]\s*.+$/, '')
+
+    return name.trim()
 }
 
-// 查找重复条目
+// 查找相似条目（同分类+相似标题）
 function findDuplicates(knowledge: KnowledgeEntry[]): DuplicateGroup[] {
     const groups = new Map<string, KnowledgeEntry[]>()
 
     for (const entry of knowledge) {
         const baseName = getBaseName(entry.title)
+        // 跳过太短的名字（可能是误匹配）
+        if (baseName.length < 2) continue
+
         const key = `${entry.category}::${baseName}`
 
         if (!groups.has(key)) {
@@ -89,27 +100,49 @@ export function MergeDuplicates({ onClose }: { onClose: () => void }) {
                     model: aiSettings.model,
                     messages: [{
                         role: 'user',
-                        content: `你是一个专业的小说资料整理专家。请将以下多个关于同一主题的资料条目合并成一个完整、详细的条目。
+                        content: `你是一个专业的小说资料整理专家。请将以下多个关于同一主题「${group.baseName}」的资料条目合并成一个完整、详细的条目。
 
-要求：
+【分类】${group.category}
+【条目数量】${group.entries.length}
+
+【合并要求】
 1. 整合所有信息，不要遗漏任何细节
-2. 去除重复内容，保留独特信息
-3. 组织成连贯的描述
-4. 如果有矛盾信息，都保留并标注
-5. 输出JSON格式，包含以下字段：
-   - title: 合并后的标题
-   - keywords: 关键词数组
-   - content: 合并后的完整内容（至少300字，详细描述）
+2. 去除完全重复的内容，保留独特信息
+3. 如果有矛盾信息，都保留并注明"（存在多种说法）"
+4. 按时间/逻辑顺序组织内容
+5. 内容要详细完整，至少500字
 
-分类: ${group.category}
-主题: ${group.baseName}
-条目数量: ${group.entries.length}
+${group.category === '人物简介' ? `【人物档案结构建议】
+- 基本信息（姓名、等级、职位等）
+- 外貌特征
+- 性格特点
+- 能力/精神体
+- 人物关系
+- 重要经历（按时间线整理）
+- 关键事件总结`
+                                : group.category === '世界观' ? `【世界观设定结构建议】
+- 概念定义
+- 历史背景
+- 运作规则
+- 相关组织/势力
+- 重要细节`
+                                    : group.category === '章节梗概' ? `【章节内容结构建议】
+- 章节范围
+- 主要事件
+- 人物互动
+- 关键转折
+- 伏笔/线索`
+                                        : `【内容结构建议】
+- 核心信息
+- 详细描述
+- 关联内容`}
 
-原始条目内容：
+【原始条目内容】
 ${allContent}
 
-请返回JSON格式，例如：
-{"title": "...", "keywords": ["...", "..."], "content": "..."}`
+【输出格式】
+请返回JSON格式：
+{"title": "简洁的标题", "keywords": ["关键词1", "关键词2", "关键词3"], "content": "详细的合并内容..."}`
                     }]
                 })
             })
