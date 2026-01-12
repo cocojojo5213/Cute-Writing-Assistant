@@ -194,7 +194,7 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
   const [cachedChunks, setCachedChunks] = useState<{ content: string; chapter?: string }[]>([])
   // 取消/暂停控制
   const abortControllerRef = useRef<AbortController | null>(null)
-  const [isPausing, setIsPausing] = useState(false)  // 用户点击了暂停按钮
+  const isPausingRef = useRef(false)  // 使用ref以避免闭包问题
 
   // 带重试的fetch函数
   const fetchWithRetry = async (
@@ -232,15 +232,15 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
 
   // 暂停分析
   const handlePause = () => {
-    setIsPausing(true)
+    isPausingRef.current = true
     abortControllerRef.current?.abort()
   }
 
   // 取消分析
   const handleCancel = () => {
+    isPausingRef.current = false
     abortControllerRef.current?.abort()
     setLoading(false)
-    setIsPausing(false)
     setPausedAt(null)
     setError('已取消分析')
   }
@@ -291,7 +291,7 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
     setLoading(true)
     setError('')
     setPausedAt(null)
-    setIsPausing(false)
+    isPausingRef.current = false
 
     // 创建AbortController用于取消
     abortControllerRef.current = new AbortController()
@@ -302,11 +302,11 @@ export function LongTextImport({ onClose }: { onClose: () => void }) {
     for (let i = resumeFrom; i < chunks.length; i++) {
       // 检查是否被暂停/取消
       if (signal.aborted) {
-        if (isPausing) {
+        if (isPausingRef.current) {
           setPausedAt(i)
           setResults(allResults)
           setLoading(false)
-          setIsPausing(false)
+          isPausingRef.current = false
           setError(`已暂停，完成 ${i}/${chunks.length} 段`)
           return
         }
@@ -407,11 +407,11 @@ ${chunks[i].content}`
       } catch (e) {
         // 检查是否是用户取消
         if (e instanceof Error && e.name === 'AbortError') {
-          if (isPausing) {
+          if (isPausingRef.current) {
             setPausedAt(i)
             setResults(allResults)
             setLoading(false)
-            setIsPausing(false)
+            isPausingRef.current = false
             setError(`已暂停，完成 ${i}/${chunks.length} 段`)
           }
           return
@@ -501,8 +501,8 @@ ${chunks[i].content}`
                   <span className="progress">
                     正在分析第 {progress.current}/{progress.total} 段...
                   </span>
-                  <button className="btn-pause" onClick={handlePause} disabled={isPausing}>
-                    {isPausing ? '暂停中...' : '暂停'}
+                  <button className="btn-pause" onClick={handlePause}>
+                    暂停
                   </button>
                   <button className="btn-cancel" onClick={handleCancel}>
                     取消
