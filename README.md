@@ -2,7 +2,7 @@
 
 一个轻量级的小说写作辅助工具，集成 AI 助手和知识库管理功能。
 
-[GitHub](https://github.com/cocojojo5213/Cute-Writing-Assistant)
+https://write.thetruetao.com/ 在线体验
 
 ## 功能特性
 
