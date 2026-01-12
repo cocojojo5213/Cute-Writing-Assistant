@@ -230,12 +230,13 @@ function splitText(text: string, maxLen = 3000): { content: string; chapter?: st
 }
 
 export function LongTextImport({ onClose }: { onClose: () => void }) {
-  const { aiSettings, addKnowledge } = useStore()
+  const { aiSettings, knowledge, addKnowledge, appendToKnowledge } = useStore()
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [results, setResults] = useState<ExtractedItem[]>([])
   const [error, setError] = useState('')
+  const [appendMode, setAppendMode] = useState(true)  // 追加模式默认开启
   // 断点续传相关状态
   const [pausedAt, setPausedAt] = useState<number | null>(null)
   const [cachedChunks, setCachedChunks] = useState<{ content: string; chapter?: string }[]>([])
@@ -497,9 +498,42 @@ ${chunks[i].content}`
       : item.title
   }))
 
+  // 提取标题的基础名称（用于匹配现有条目）
+  const getBaseName = (title: string): string => {
+    let name = title.replace(/\s*[（(]\d+[)）]\s*$/, '')
+    name = name.replace(/\s*[（(][^)）]+[)）]\s*$/, '')
+    name = name.replace(/\s*[-—：:]\s*.+$/, '')
+    return name.trim()
+  }
+
+  // 查找匹配的现有条目
+  const findExistingEntry = (category: string, title: string) => {
+    const baseName = getBaseName(title)
+    return knowledge.find(k =>
+      k.category === category &&
+      getBaseName(k.title) === baseName
+    )
+  }
+
   const handleImport = async () => {
+    let appendedCount = 0
+    let createdCount = 0
+
     for (const item of mergedResults) {
-      // 创建空的details结构，将content放入第一个字段
+      if (appendMode) {
+        // 追加模式：检查是否有同名条目
+        const existing = findExistingEntry(item.category, item.title)
+
+        if (existing) {
+          // 追加到现有条目
+          const newContent = `\n\n---\n\n【新增信息】\n${item.content}`
+          appendToKnowledge(existing.id, newContent)
+          appendedCount++
+          continue
+        }
+      }
+
+      // 创建新条目
       const details = createEmptyDetails(item.category)
       const firstKey = Object.keys(details)[0]
       if (firstKey) {
@@ -512,10 +546,17 @@ ${chunks[i].content}`
         keywords: item.keywords,
         details: details
       })
+      createdCount++
 
       // 添加小延迟确保ID不重复
       await new Promise(r => setTimeout(r, 1))
     }
+
+    // 显示导入结果
+    const message = appendMode
+      ? `导入完成：新建 ${createdCount} 条，追加 ${appendedCount} 条`
+      : `导入完成：共 ${createdCount} 条`
+    alert(message)
     onClose()
   }
 
@@ -615,12 +656,26 @@ ${chunks[i].content}`
             <p className="hint">
               ✅ 分析完成，共提取 {mergedResults.length} 个条目
             </p>
+            <div className="import-options">
+              <label className="checkbox-option">
+                <input
+                  type="checkbox"
+                  checked={appendMode}
+                  onChange={e => setAppendMode(e.target.checked)}
+                />
+                <span>🔗 追加模式</span>
+                <span className="option-hint">（同名条目追加内容而非创建新条目）</span>
+              </label>
+            </div>
             <div className="result-list">
               {mergedResults.map((item, i) => (
                 <div key={i} className="result-item">
                   <div className="result-header">
                     <span className="category-tag">{item.category}</span>
                     <span className="result-title">{item.title}</span>
+                    {appendMode && findExistingEntry(item.category, item.title) && (
+                      <span className="append-badge">📎 将追加</span>
+                    )}
                   </div>
                   <div className="result-keywords">关键词: {Array.isArray(item.keywords) ? item.keywords.join(', ') : String(item.keywords || '')}</div>
                   <div className="result-preview">{item.content.slice(0, 150)}...</div>
@@ -630,7 +685,7 @@ ${chunks[i].content}`
             <div className="long-footer">
               <button className="btn-back" onClick={() => setResults([])}>重新分析</button>
               <button className="btn-import" onClick={handleImport}>
-                全部导入知识库 ({mergedResults.length})
+                {appendMode ? '智能导入' : '全部导入'} ({mergedResults.length})
               </button>
             </div>
           </>
