@@ -525,7 +525,53 @@ ${chunks[i].content}`
         <button className="btn-close" onClick={onClose}>x</button>
         <h3>长文分析导入</h3>
 
-        {results.length === 0 ? (
+        {loading ? (
+          <>
+            <p className="hint">
+              正在分析中，请耐心等待...
+            </p>
+            <div className="progress-panel">
+              <div className="progress-info">
+                <span className="progress-text">
+                  📊 进度: <strong>{progress.current}</strong> / {progress.total} 段
+                </span>
+                <span className="progress-text">
+                  📝 已提取: <strong>{results.length}</strong> 个条目
+                </span>
+              </div>
+              <div className="progress-bar">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                />
+              </div>
+              {results.length > 0 && (
+                <div className="realtime-results">
+                  <p className="realtime-title">实时提取结果预览：</p>
+                  <div className="realtime-list">
+                    {results.slice(-5).map((item, i) => (
+                      <div key={i} className="realtime-item">
+                        <span className="category-tag">{item.category}</span>
+                        <span>{item.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="long-footer">
+              <span className="char-count">{text.length.toLocaleString()} 字</span>
+              <div className="loading-controls">
+                <button className="btn-pause" onClick={handlePause}>
+                  暂停
+                </button>
+                <button className="btn-cancel" onClick={handleCancel}>
+                  取消
+                </button>
+              </div>
+            </div>
+          </>
+        ) : results.length === 0 ? (
           <>
             <p className="hint">
               导入小说文件或粘贴内容（支持10万字以上），系统会自动分段让 AI 逐段分析，提取人物、设定等信息。
@@ -547,19 +593,7 @@ ${chunks[i].content}`
             {error && <p className="error-msg">{error}</p>}
             <div className="long-footer">
               <span className="char-count">{text.length.toLocaleString()} 字</span>
-              {loading ? (
-                <div className="loading-controls">
-                  <span className="progress">
-                    正在分析第 {progress.current}/{progress.total} 段...
-                  </span>
-                  <button className="btn-pause" onClick={handlePause}>
-                    暂停
-                  </button>
-                  <button className="btn-cancel" onClick={handleCancel}>
-                    取消
-                  </button>
-                </div>
-              ) : pausedAt !== null ? (
+              {pausedAt !== null ? (
                 <div className="resume-section">
                   <span className="pause-info">已完成 {pausedAt}/{cachedChunks.length} 段（第{pausedAt + 1}段失败），已提取 {results.length} 条</span>
                   <button className="btn-resume" onClick={() => handleAnalyze(pausedAt)}>
@@ -579,7 +613,7 @@ ${chunks[i].content}`
         ) : (
           <>
             <p className="hint">
-              分析完成，共提取 {mergedResults.length} 个条目（已自动合并相同项）
+              ✅ 分析完成，共提取 {mergedResults.length} 个条目
             </p>
             <div className="result-list">
               {mergedResults.map((item, i) => (
