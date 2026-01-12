@@ -132,7 +132,7 @@ export const useStore = create<Store>()(
         set((s) => ({
           knowledge: s.knowledge.map((k) => {
             if (k.id !== id) return k
-            const details = { ...k.details } as Record<string, string>
+            const details = { ...k.details }
             // 找到第一个文本字段追加内容
             const firstKey = Object.keys(details)[0]
             if (firstKey) {

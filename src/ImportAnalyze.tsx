@@ -72,7 +72,7 @@ ${text}`
   const handleImport = () => {
     entries.filter(e => e.selected).forEach(e => {
       // 创建空的details结构，将content放入第一个字段
-      const details = createEmptyDetails(e.category) as Record<string, string>
+      const details = createEmptyDetails(e.category)
       const firstKey = Object.keys(details)[0]
       if (firstKey) {
         details[firstKey] = e.content

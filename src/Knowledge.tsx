@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from './store'
-import type { KnowledgeEntry, KnowledgeCategory } from './types'
+import type { KnowledgeCategory } from './types'
 import { CATEGORY_FIELDS, createEmptyDetails } from './types'
 import { ImportAnalyze } from './ImportAnalyze'
 import { LongTextImport } from './LongTextImport'
@@ -27,7 +27,7 @@ export function Knowledge({ onClose }: { onClose: () => void }) {
     title: '',
     category: '人物简介',
     keywords: '',
-    details: createEmptyDetails('人物简介') as Record<string, string>
+    details: createEmptyDetails('人物简介')
   })
 
   const filtered = filter === '全部' ? knowledge : knowledge.filter(k => k.category === filter)
@@ -46,7 +46,7 @@ export function Knowledge({ onClose }: { onClose: () => void }) {
       title: '',
       category: '人物简介',
       keywords: '',
-      details: createEmptyDetails('人物简介') as Record<string, string>
+      details: createEmptyDetails('人物简介')
     })
     setEditing(true)
   }
@@ -57,7 +57,7 @@ export function Knowledge({ onClose }: { onClose: () => void }) {
         title: selected.title,
         category: selected.category,
         keywords: selected.keywords.join(', '),
-        details: selected.details as Record<string, string>
+        details: selected.details
       })
       setEditing(true)
     }
@@ -67,7 +67,7 @@ export function Knowledge({ onClose }: { onClose: () => void }) {
     setForm({
       ...form,
       category: newCategory,
-      details: createEmptyDetails(newCategory) as Record<string, string>
+      details: createEmptyDetails(newCategory)
     })
   }
 
@@ -202,7 +202,7 @@ export function Knowledge({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="detail-sections">
                   {CATEGORY_FIELDS[selected.category].map(field => {
-                    const value = (selected.details as Record<string, string>)[field.key]
+                    const value = selected.details[field.key]
                     if (!value) return null
                     return (
                       <div key={field.key} className="detail-section">

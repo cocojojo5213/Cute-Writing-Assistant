@@ -27,7 +27,7 @@ export function getMatchedKnowledge(text: string): KnowledgeEntry[] {
  */
 function formatKnowledgeDetails(entry: KnowledgeEntry): string {
   const fields = CATEGORY_FIELDS[entry.category]
-  const details = entry.details as unknown as Record<string, string>
+  const details = entry.details
   const parts: string[] = []
   
   fields.forEach(field => {

@@ -131,13 +131,13 @@ export type DetailsMap = {
   '写作素材': MaterialDetails
 }
 
-// 知识库条目类型
+// 知识库条目类型（使用通用的 Record 类型简化类型检查）
 export interface KnowledgeEntry {
   id: string
   category: KnowledgeCategory
   title: string
   keywords: string[]
-  details: DetailsMap[KnowledgeCategory]
+  details: Record<string, string>
 }
 
 // 各分类的字段配置
@@ -208,11 +208,11 @@ export const CATEGORY_FIELDS: Record<KnowledgeCategory, { key: string; label: st
 }
 
 // 创建空的详情对象
-export function createEmptyDetails(category: KnowledgeCategory): DetailsMap[KnowledgeCategory] {
+export function createEmptyDetails(category: KnowledgeCategory): Record<string, string> {
   const fields = CATEGORY_FIELDS[category]
   const details: Record<string, string> = {}
   fields.forEach(f => {
     details[f.key] = f.key === 'status' ? '未揭示' : ''
   })
-  return details as unknown as DetailsMap[KnowledgeCategory]
+  return details
 }

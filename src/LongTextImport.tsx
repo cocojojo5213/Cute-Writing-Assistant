@@ -205,7 +205,7 @@ ${chunks[i].content}`
   const handleImport = () => {
     mergedResults.forEach(item => {
       // 创建空的details结构，将content放入第一个字段
-      const details = createEmptyDetails(item.category) as Record<string, string>
+      const details = createEmptyDetails(item.category)
       const firstKey = Object.keys(details)[0]
       if (firstKey) {
         details[firstKey] = item.content
